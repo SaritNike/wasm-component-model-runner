@@ -1,0 +1,15 @@
+package saritnike:cipher@0.1.0;
+
+interface audit-log {
+    auditrecord: func(action: string, detail: string);
+}
+
+world encoder-decoder-service {
+
+    import audit-log;
+
+    export encrypt: func(input: string) -> string;
+    export decrypt: func(input: string) -> string;
+
+    
+}
