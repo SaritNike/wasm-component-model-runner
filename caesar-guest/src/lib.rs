@@ -17,15 +17,15 @@ struct CaesarCipherComponent;
 
 impl bindings::Guest for CaesarCipherComponent {
 
-    async fn encrypt(input: String,) -> String {
+    async fn encr(input: String,) -> String {
         // provided by the host:
         audit_log::auditrecord("encrypt".to_string(), format!("Length: {}", input.len())).await;
         let shift = get_shift();
         shift_string(&input, shift)
     }
 
-    async fn decrypt(input: String,) -> String {
-        // provided by the host:-
+    async fn decr(input: String,) -> String {
+        // provided by the host:
         audit_log::auditrecord("decrypt".to_string(), format!("Length: {}", input.len())).await;
         let shift = get_shift();
         shift_string(&input, 26-(shift % 26))

@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+use serde::Deserialize;
 use wasmtime::{ Engine, Store, component::{Component, Linker, bindgen}};
 use wasmtime_wasi::{ResourceTable, WasiCtx, WasiCtxBuilder, WasiCtxView, WasiView };
 
@@ -9,6 +11,7 @@ bindgen!({
         exports: { default: async },
 });
 
+// the audit-log capability provided by the host to the guests
 impl saritnike::cipher::audit_log::Host for HostState {
     async fn auditrecord(&mut self,action: String, detail: String) {
         println!("[AUDIT] Action: {} | Detail: {}", action, detail);
@@ -33,20 +36,40 @@ pub enum Operation {
     Decrypt,
 }
 
+#[derive(Deserialize, Clone, Hash, PartialEq, Eq)]
+pub enum Algorithm {
+    Caesar,
+    Vigenere
+}
+
 
 #[derive(Clone)]
 pub struct AppState {
     pub engine: Engine,
-    pub component: Component,
+    pub components: HashMap<Algorithm,Guest>,
     pub linker: Linker<HostState>,
-    pub shift_amount: String,
+}
+
+#[derive(Clone)]
+pub struct Guest {
+    pub component: Component,
+    pub env_vars: Vec<(String, String)>
 }
 
 
-pub async fn run_wasm(app: &AppState, input: String, operation: Operation) -> String {
-    let wasi_ctx = WasiCtxBuilder::new()
+pub async fn run_wasm(app: &AppState, input: String, algorithm: Algorithm, operation: Operation) -> String {
+    
+    let guest : &Guest;
+
+    match algorithm {
+        Algorithm::Caesar => guest = &app.components[&Algorithm::Caesar],
+        Algorithm::Vigenere => guest = &app.components[&Algorithm::Vigenere],
+    }
+
+
+    let wasi_ctx =  WasiCtxBuilder::new()
         .inherit_stdio()
-        .env("SHIFT_AMOUNT", &app.shift_amount)
+        .envs(&guest.env_vars)
         .build();
 
     let host_ctx = HostState {
@@ -56,15 +79,15 @@ pub async fn run_wasm(app: &AppState, input: String, operation: Operation) -> St
 
     let mut store = Store::new(&app.engine, host_ctx);
 
-    let cipher = EncoderDecoderService::instantiate_async(&mut store, &app.component, &app.linker)
+    let cipher = EncoderDecoderService::instantiate_async(&mut store, &guest.component, &app.linker)
         .await.expect("Failed to instantiate");
 
     match operation {
         Operation::Encrypt => {
-            cipher.call_encrypt(&mut store, &input).await.unwrap_or_else(|e| e.to_string())
+            cipher.call_encr(&mut store, &input).await.unwrap_or_else(|e| e.to_string())
         }
         Operation::Decrypt => {
-            cipher.call_decrypt(&mut store, &input).await.unwrap_or_else(|e| e.to_string())
+            cipher.call_decr(&mut store, &input).await.unwrap_or_else(|e| e.to_string())
         }
     }
 }

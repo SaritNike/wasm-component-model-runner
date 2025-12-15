@@ -21,3 +21,5 @@ target
 #.idea/
 
 *guest.wasm
+env
+__pycache__
